@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Kick Ro • More or Less</title>
+
+  <style>
+    :root{
+      --bg:#000;
+      --line:rgba(255,255,255,.10);
+      --text:#fff;
+      --muted:rgba(255,255,255,.58);
+
+      --green:#53FC18;
+      --green2:#2fe10b;
+
+      --shadow: 0 30px 120px rgba(0,0,0,.90);
+      --topH:56px;
+
+      /* rail width (folosit și la animatie) */
+      --railW:86px;
+
+      /* swipe timing - smoother easing */
+      --swipeMs:520ms;
+      --swipeEase:cubic-bezier(.25,.46,.45,.94);
+      
+      /* transition defaults */
+      --transFast:120ms cubic-bezier(.2,.9,.2,1);
+      --transMid:240ms cubic-bezier(.34,.1,.68,1);
+      --transSlow:360ms cubic-bezier(.2,.9,.2,1);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+      color:var(--text);
+      background: var(--bg);
+      overflow:hidden;
+    }
+
+    /* BACKGROUND: pure black + subtle green aura + grain */
+    .bg{
+      position:fixed; inset:0; z-index:0; pointer-events:none;
+      background:
+        radial-gradient(1200px 720px at 30% 45%, rgba(83,252,24,.06), transparent 60%),
+        radial-gradient(1200px 720px at 70% 45%, rgba(83,252,24,.04), transparent 62%),
+        radial-gradient(900px 600px at 50% 80%, rgba(255,255,255,.02), transparent 60%),
+        #000;
+      filter:saturate(1.05);
+    }
+    .bg::after{
+      content:"";
+      position:absolute; inset:0;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.25'/%3E%3C/svg%3E");
+      opacity:.08;
+      mix-blend-mode: overlay;
+    }
+    .vignette{
+      position:fixed; inset:0; z-index:1; pointer-events:none;
+      background: radial-gradient(1200px 780px at 50% 45%, transparent 45%, rgba(0,0,0,.92) 78%);
+    }
+
+    /* TOP */
+    .top{
+      position:fixed; left:0; right:0; top:0;
+      height:var(--topH);
+      z-index:10;
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 0 14px;
+      gap:12px;
+    }
+    .back{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 14px;
+      border-radius: 999px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+      color:#fff;
+      text-decoration:none;
+      font-weight:1000;
+      box-shadow: 0 18px 45px rgba(0,0,0,.55);
+      user-select:none;
+    }
+    .back .arrow{font-size:18px; opacity:.9; transform: translateY(-1px);}
+
+    /* HUD (doar scor + record) */
+    .hud{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      border-radius: 999px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 45px rgba(0,0,0,.55);
+      user-select:none;
+      max-width: 64vw;
+      overflow:hidden;
+      white-space:nowrap;
+    }
+    .hud .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.03);
+      border:1px solid rgba(255,255,255,.08);
+      font-weight:1000;
+      font-size:12px;
+      letter-spacing:.4px;
+      text-transform:uppercase;
+      color: rgba(255,255,255,.72);
+    }
+    .hud .pill b{
+      color:#fff;
+      font-size:13px;
+      letter-spacing:0;
+      text-transform:none;
+    }
+    .hud .pill .g{
+      color: var(--green);
+      text-shadow: 0 0 14px rgba(83,252,24,.25);
+    }
+
+    /* LAYOUT */
+    .wrap{
+      position:relative;
+      z-index:2;
+      height: calc(100vh - var(--topH));
+      display:grid;
+      grid-template-columns: 1fr var(--railW) 1fr;
+      padding-top: var(--topH);
+    }
+
+    /* CENTER RAIL */
+    .rail{
+      position:relative;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      height: 100%;
+      min-height: calc(100vh - var(--topH));
+    }
+    /* LINIA FULL, MAI GROASĂ */
+    .rail::before{
+      content:"";
+      position:fixed;
+      left:50%;
+      transform: translateX(-50%);
+      top:0;
+      height: 100vh;
+      width:4px;
+      border-radius:999px;
+      background: rgba(255,255,255,.20);
+      opacity:.55;
+      z-index:1;
+    }
+    .vs{
+      width:56px; height:56px;
+      border-radius:999px;
+      display:grid;
+      place-items:center;
+      font-weight:1000;
+      text-transform:uppercase;
+      letter-spacing:1px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 20px 60px rgba(0,0,0,.70);
+      color: rgba(255,255,255,.92);
+      position:relative;
+    }
+    .vs::after{
+      content:"";
+      position:absolute; inset:-14px;
+      border-radius:999px;
+      background: radial-gradient(circle, rgba(83,252,24,.16), transparent 60%);
+      filter: blur(10px);
+      opacity:.55;
+      pointer-events:none;
+    }
+
+    /* SIDES */
+    .side{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: 18px 18px 22px;
+      min-height: calc(100vh - var(--topH));
+      overflow: visible;
+    }
+
+    .panel{
+      width:min(760px, 94%);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      gap: 10px;
+      will-change: transform, opacity;
+      transform: translateZ(0);
+      backface-visibility: hidden;
+      perspective: 1000px;
+    }
+
+    .avatar{
+      width: 260px;
+      height: 260px;
+      border-radius: 999px;
+      overflow:hidden;
+      background: rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow: 0 28px 90px rgba(0,0,0,.75);
+      position:relative;
+      transition: transform var(--transMid), filter var(--transMid);
+    }
+    .avatar::before{
+      content:"";
+      position:absolute; inset:-3px;
+      border-radius:999px;
+      background: radial-gradient(70% 70% at 50% 50%, rgba(83,252,24,.14), transparent 62%);
+      filter: blur(12px);
+      opacity:.65;
+      pointer-events:none;
+    }
+    .avatar img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      -webkit-user-drag:none;
+      user-select:none;
+      position:relative;
+      z-index:1;
+    }
+
+    .nameBig{
+      margin-top: 6px;
+      font-size: 56px;
+      font-weight: 1000;
+      letter-spacing:.2px;
+      text-shadow: 0 12px 50px rgba(0,0,0,.75);
+    }
+
+    .sub{
+      margin-top:-6px;
+      font-weight: 1000;
+      color: rgba(255,255,255,.52);
+      letter-spacing:.45px;
+      text-transform: uppercase;
+      font-size: 12px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      justify-content:center;
+    }
+    .sub .sep{ opacity:.25; }
+
+    .value{
+      margin-top: 4px;
+      font-size: 92px;
+      font-weight: 1000;
+      letter-spacing:.2px;
+      line-height:1;
+      color:#fff;
+      text-shadow: 0 0 22px rgba(83,252,24,.10);
+    }
+
+    /* BUTTONS (glow, fără pulse) */
+    .btns{
+      margin-top: 14px;
+      width: min(440px, 92%);
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .btn{
+      height:66px;
+      border-radius: 18px;
+      border:1px solid rgba(83,252,24,.62);
+      background: linear-gradient(135deg, rgba(83,252,24,.98), rgba(47,225,11,.72));
+      color:#041004;
+      cursor:pointer;
+      font-weight:1000;
+      font-size: 18px;
+      letter-spacing:.3px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      user-select:none;
+
+      box-shadow:
+        0 18px 55px rgba(0,0,0,.65),
+        0 0 22px rgba(83,252,24,.26),
+        0 0 80px rgba(83,252,24,.12);
+
+      transition: 
+        transform var(--transFast),
+        filter var(--transFast),
+        box-shadow var(--transMid),
+        background var(--transMid);
+      position:relative;
+      overflow:hidden;
+    }
+    .btn::after{
+      content:"";
+      position:absolute; inset:-14px;
+      background: radial-gradient(60% 90% at 50% 50%, rgba(83,252,24,.35), transparent 55%);
+      opacity:.55;
+      filter: blur(12px);
+      pointer-events:none;
+    }
+    .btn:hover{
+      transform: translateY(-2px);
+      filter: brightness(1.08);
+      box-shadow:
+        0 22px 65px rgba(0,0,0,.68),
+        0 0 40px rgba(83,252,24,.35),
+        0 0 120px rgba(83,252,24,.18);
+    }
+    .btn:active{ 
+      transform: translateY(1px); 
+    }
+
+    .revealLine{
+      margin-top:12px;
+      min-height: 24px;
+      font-weight:1000;
+      color: rgba(255,255,255,.82);
+      opacity:0;
+      transform: translateY(8px);
+      transition: opacity var(--transMid) ease, transform var(--transMid) ease;
+    }
+    .revealLine.show{ 
+      opacity:1; 
+      transform: translateY(0); 
+    }
+
+    /* ===== SWIPE ANIMATIONS (când e corect) - ULTRA SMOOTH ===== */
+    .swipe-out-left{
+      animation: swipeOutLeft var(--swipeMs) var(--swipeEase) forwards;
+    }
+    .swipe-to-left{
+      animation: swipeToLeft var(--swipeMs) var(--swipeEase) forwards;
+    }
+    .swipe-in-right-pre{
+      transform: translateX(calc(100% + var(--railW))) scale(0.88);
+      opacity: 0.2;
+    }
+    .swipe-in-right{
+      animation: swipeInRight var(--swipeMs) var(--swipeEase) forwards;
+    }
+
+    @keyframes swipeOutLeft{
+      0%{ transform: translateX(0) scale(1) rotateY(0deg); opacity:1; }
+      50%{ opacity: 0.7; }
+      100%  { transform: translateX(-110%) scale(0.85) rotateY(-8deg); opacity:0; }
+    }
+    @keyframes swipeToLeft{
+      0%{ transform: translateX(0); opacity:1; }
+      100%  { transform: translateX(0); opacity:1; }
+    }
+    @keyframes swipeInRight{
+      0%{ transform: translateX(calc(100% + var(--railW))) scale(0.88) rotateY(8deg); opacity:.15; }
+      60%{ opacity: 0.9; }
+      100%  { transform: translateX(0) scale(1) rotateY(0deg); opacity:1; }
+    }
+
+    /* flash */
+    .flash{ 
+      position:fixed; inset:0; pointer-events:none; opacity:0; z-index:15;
+      transition: opacity var(--transFast) ease;
+      will-change: opacity;
+    }
+    .flash.ok{ background: rgba(83,252,24,.06); }
+    .flash.bad{ background: rgba(255,255,255,.05); }
+    .flash.show{ opacity:1; }
+
+    /* modal + gifs */
+    .overlay{
+      position:fixed; inset:0;
+      display:none; align-items:center; justify-content:center;
+      background: rgba(0,0,0,.78);
+      backdrop-filter: blur(12px);
+      z-index:20;
+      padding:18px;
+      opacity: 0;
+      transition: opacity var(--transMid) ease;
+    }
+    .overlay.show{ 
+      display:flex;
+      opacity: 1;
+    }
+
+    .modal{
+      width:min(720px, 96%);
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.82);
+      box-shadow: var(--shadow);
+      padding:18px 18px 16px;
+      text-align:center;
+      border-radius: 18px;
+      position:relative;
+      overflow:hidden;
+      transform: scale(0.92) translateY(20px);
+      opacity: 0;
+      transition: transform var(--transMid), opacity var(--transMid);
+    }
+    .overlay.show .modal{
+      transform: scale(1) translateY(0);
+      opacity: 1;
+    }
+    .modal::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: radial-gradient(900px 420px at 50% 0%, rgba(83,252,24,.10), transparent 62%);
+      opacity:.85;
+      pointer-events:none;
+      filter: blur(20px);
+    }
+    .modal > *{ position:relative; z-index:1; }
+
+    .modal h2{
+      margin:6px 0 8px;
+      font-size:34px;
+      letter-spacing:.6px;
+      font-weight:1000;
+      text-transform:uppercase;
+      text-shadow: 0 0 18px rgba(83,252,24,.18);
+    }
+    .modalGif{
+      width: 220px;
+      max-width: 70%;
+      height:auto;
+      margin: 10px auto 6px;
+      display:none;
+      border-radius: 16px;
+      box-shadow: 0 16px 60px rgba(0,0,0,.65), 0 0 28px rgba(83,252,24,.14);
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
+      -webkit-user-drag:none;
+      user-select:none;
+    }
+    .modal p{
+      margin:10px 0 0;
+      color: rgba(255,255,255,.92);
+      font-weight:900;
+      line-height:1.35;
+      font-size:15px;
+    }
+
+    .statsRow{
+      margin-top:14px;
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+    .statCard{
+      min-width: 190px;
+      padding:12px 14px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.04);
+      box-shadow: 0 18px 55px rgba(0,0,0,.35);
+      font-weight:1000;
+    }
+    .statCard .k{ display:block; font-size:12px; opacity:.65; letter-spacing:.4px; text-transform:uppercase; }
+    .statCard .v{ display:block; font-size:24px; margin-top:4px; color:#fff; }
+    .statCard.green{
+      border-color: rgba(83,252,24,.30);
+      background: rgba(83,252,24,.06);
+    }
+    .statCard.green .v{
+      color: var(--green);
+      text-shadow: 0 0 16px rgba(83,252,24,.22);
+    }
+
+    .actions{
+      margin-top:16px;
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+    .mBtn{
+      border:1px solid rgba(83,252,24,.45);
+      background: linear-gradient(135deg, rgba(83,252,24,.95), rgba(47,225,11,.70));
+      color:#041004;
+      padding:12px 16px;
+      cursor:pointer;
+      font-weight:1000;
+      border-radius: 14px;
+      transition: transform .12s ease, filter .12s ease, box-shadow .18s ease;
+      box-shadow: 0 18px 55px rgba(0,0,0,.55), 0 0 18px rgba(83,252,24,.14);
+      user-select:none;
+    }
+    .mBtn:hover{
+      filter: brightness(1.06);
+      box-shadow: 0 18px 55px rgba(0,0,0,.55), 0 0 30px rgba(83,252,24,.18);
+    }
+    .mBtn:active{ transform: translateY(1px); }
+
+    /* Loading – Choso */
+    .loading{
+      position:fixed; inset:0; z-index:25;
+      display:flex; align-items:center; justify-content:center;
+      background: rgba(0,0,0,.82);
+      backdrop-filter: blur(12px);
+      opacity: 1;
+      transition: opacity var(--transSlow) ease;
+    }
+    .loading.hide{
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loadInline{
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      text-align:center;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.70);
+      box-shadow: 0 28px 90px rgba(0,0,0,.75);
+      transform: scale(1) translateY(0);
+      transition: transform var(--transMid), opacity var(--transMid);
+    }
+    .loading.hide .loadInline{
+      transform: scale(0.92) translateY(10px);
+      opacity: 0;
+    }
+    .loaderGif{
+      width:120px;
+      height:auto;
+      filter: drop-shadow(0 0 18px rgba(83,252,24,.10));
+      -webkit-user-drag:none;
+      user-select:none;
+    }
+    .loadText{
+      font-weight:1000;
+      letter-spacing:.5px;
+      text-transform:uppercase;
+      font-size:13px;
+      color: rgba(255,255,255,.88);
+    }
+    .loadPct{
+      font-weight:1000;
+      font-size:12px;
+      color: rgba(83,252,24,.95);
+      text-shadow: 0 0 14px rgba(83,252,24,.18);
+    }
+    .thinBar{
+      width: min(320px, 72vw);
+      height: 4px;
+      background: rgba(255,255,255,.10);
+      overflow:hidden;
+      border-radius: 999px;
+      margin-top: 2px;
+    }
+    .thinBar > div{
+      height:100%;
+      width:0%;
+      background: rgba(83,252,24,.95);
+      transition: width .28s cubic-bezier(.2,.9,.3,1);
+      box-shadow: 0 0 14px rgba(83,252,24,.18);
+    }
+
+    .disclaimer{
+      position:fixed;
+      left:0; right:0; bottom:10px;
+      text-align:center;
+      font-size:12px;
+      color:rgba(255,255,255,.40);
+      font-weight:1000;
+      pointer-events:none;
+      user-select:none;
+      z-index: 9;
+      text-shadow: 0 2px 20px rgba(0,0,0,.70);
+    }
+
+    /* păstrăm layout 3 coloane și pe mobil (ca să rămână linia verticală) */
+    @media (max-width: 1040px){
+      .avatar{ width:200px; height:200px; }
+      .nameBig{ font-size:40px; }
+      .value{ font-size:72px; }
+      .modalGif{ width: 200px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg"></div>
+  <div class="vignette"></div>
+
+  <div class="top">
+    <a class="back" href="/"><span class="arrow">‹</span><span>Acasa</span></a>
+
+    <div class="hud" aria-label="HUD">
+      <span class="pill">Scor <b class="g" id="hudScore">0</b></span>
+      <span class="pill">Record <b class="g" id="hudBest">0</b></span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section class="side">
+      <div class="panel" id="leftPanel">
+        <div class="avatar"><img id="leftImg" alt="stânga" /></div>
+        <div class="nameBig" id="leftName">—</div>
+        <div class="sub"><span></span><span class="sep"></span><span></span></div>
+        <div class="value" id="leftValue">—</div>
+      </div>
+    </section>
+
+    <div class="rail"><div class="vs">vs</div></div>
+
+    <section class="side">
+      <div class="panel" id="rightPanel">
+        <div class="avatar"><img id="rightImg" alt="dreapta" /></div>
+        <div class="nameBig" id="rightName">—</div>
+        <div class="sub"><span></span><span class="sep"></span><span></span></div>
+
+        <div class="btns">
+          <button class="btn" id="btnMore">↑ Mult</button>
+          <button class="btn" id="btnLess">↓ Puțin</button>
+        </div>
+
+        <div class="revealLine" id="revealLine"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="flash ok" id="flashOk"></div>
+  <div class="flash bad" id="flashBad"></div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <h2 id="modalTitle"></h2>
+      <img id="modalGif" class="modalGif" alt="gif" />
+      <p id="overText">—</p>
+
+      <div class="statsRow">
+        <div class="statCard">
+          <span class="k">SCOR</span>
+          <span class="v" id="finalScore">0</span>
+        </div>
+        <div class="statCard green">
+          <span class="k">RECORD</span>
+          <span class="v" id="finalHigh">0</span>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="mBtn" id="playAgain">Joacă din nou</button>
+        <button class="mBtn" id="resetHigh">Resetează recordul</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="loadInline">
+      <img class="loaderGif" src="https://media.tenor.com/wec6SY58vXYAAAAi/choso-jjk.gif" alt="Loading">
+      <div class="loadText" id="loadText">Se încarcă…</div>
+      <div class="loadPct" id="loadPct">0%</div>
+      <div class="thinBar"><div id="barFill"></div></div>
+    </div>
+  </div>
+
+  <div class="disclaimer"></div>
+
+  <script>
+    // ====== GIFS (modal) ======
+    const GIF_FAIL = "https://media.tenor.com/Lz0lnJb-HiwAAAAM/nooo.gif";
+    const GIF_WIN  = "https://media1.tenor.com/m/Cse00b9Ls-4AAAAC/goobers.gif";
+
+    const KICK_URLS = [
+      "https://kick.com/hyghman","https://kick.com/w2ge","https://kick.com/roxanne_roxx","https://kick.com/ket_14",
+      "https://kick.com/godeanu","https://kick.com/poseidonn99","https://kick.com/anduu14","https://kick.com/stezyvr",
+      "https://kick.com/tedereu","https://kick.com/cartusu","https://kick.com/nicusor7gaming","https://kick.com/markoglasslive",
+      "https://kick.com/potrix","https://kick.com/zasami","https://kick.com/og-sushi","https://kick.com/og-sushi","https://kick.com/ryuck123"
+      ,"https://kick.com/kat4n4","https://kick.com/zombilau","https://kick.com/agachi6969","https://kick.com/gianyfifa","https://kick.com/azey1337"
+      ,"https://kick.com/alysia-k12","https://kick.com/sarkales","https://kick.com/danicafeluta","https://kick.com/navashy","https://kick.com/kasimksm"
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const fmt = (n) => new Intl.NumberFormat("ro-RO").format(n);
+
+    const KEY_HIGH = `mol_solo_high_default`;
+    let highscore = Number(localStorage.getItem(KEY_HIGH) || 0);
+
+    function updateHUD(){
+      $("hudScore").textContent = String(score);
+      $("hudBest").textContent = String(highscore);
+    }
+
+    function slugFromUrl(u){
+      try{ const url = new URL(u); return url.pathname.replace(/^\/+/, "").split("/")[0].trim().toLowerCase(); }
+      catch{ return String(u).trim().replace(/^https?:\/\/kick\.com\//, "").replace(/^@/,"").toLowerCase(); }
+    }
+
+    function shuffle(arr){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i],a[j]] = [a[j],a[i]];
+      }
+      return a;
+    }
+
+    function setImg(imgEl, url){
+      imgEl.style.display = "";
+      imgEl.src = url || "";
+      imgEl.onerror = () => {
+        imgEl.style.display = "none";
+        imgEl.parentElement.style.background =
+          "radial-gradient(circle at 30% 30%, rgba(83,252,24,.14), transparent 60%)," +
+          "linear-gradient(135deg, rgba(83,252,24,.10), rgba(255,255,255,.03))";
+      };
+    }
+
+    function flash(kind){
+      const el = kind === "ok" ? $("flashOk") : $("flashBad");
+      el.classList.add("show");
+      requestAnimationFrame(() => {
+        setTimeout(() => el.classList.remove("show"), 140);
+      });
+    }
+
+    let locked = false;
+    function setLocked(v){
+      locked = v;
+      $("btnMore").disabled = v;
+      $("btnLess").disabled = v;
+      $("btnMore").style.opacity = v ? .82 : 1;
+      $("btnLess").style.opacity = v ? .82 : 1;
+    }
+
+    function setLoad(pct){
+      const p = Math.max(0, Math.min(100, Math.round(pct)));
+      $("barFill").style.width = p + "%";
+      $("loadPct").textContent = p + "%";
+    }
+
+    let score = 0;
+    let PLAYERS = [];
+    let deck = [];
+    let idx = 0;
+    let left = null;
+    let right = null;
+
+    const leftImg = $("leftImg");
+    const leftName = $("leftName");
+    const leftValue = $("leftValue");
+    const rightImg = $("rightImg");
+    const rightName = $("rightName");
+    const revealLine = $("revealLine");
+
+    const overlay = $("overlay");
+    const modalTitle = $("modalTitle");
+    const overText = $("overText");
+    const finalScore = $("finalScore");
+    const finalHigh = $("finalHigh");
+
+    const leftPanel = $("leftPanel");
+    const rightPanel = $("rightPanel");
+
+    const SWIPE_MS = 520; // să bată cu CSS --swipeMs
+
+    function renderAll(){
+      setImg(leftImg, left.profilePic);
+      leftName.textContent = left.displayName;
+      leftValue.textContent = fmt(left.followers);
+
+      setImg(rightImg, right.profilePic);
+      rightName.textContent = right.displayName;
+
+      revealLine.textContent = "";
+      revealLine.classList.remove("show");
+
+      updateHUD();
+    }
+
+    function revealRight(){
+      revealLine.textContent = `${right.displayName} are ${fmt(right.followers)} urmăritori`;
+      revealLine.classList.add("show");
+    }
+
+    function openModal(title, html, gifUrl=""){
+      modalTitle.textContent = title;
+      overText.innerHTML = html;
+      finalScore.textContent = score;
+      finalHigh.textContent = highscore;
+
+      const gif = $("modalGif");
+      if(gifUrl){
+        gif.src = gifUrl;
+        gif.style.display = "block";
+      }else{
+        gif.removeAttribute("src");
+        gif.style.display = "none";
+      }
+
+      requestAnimationFrame(() => {
+        overlay.classList.add("show");
+      });
+    }
+
+    function gameOver(){
+      const relation =
+        right.followers > left.followers ? "mai mult" :
+        (right.followers < left.followers ? "mai puțin" : "la fel de mulți ca");
+
+      openModal(
+        "",
+        `Ai greșit. <b>${right.displayName}</b> are <b>${fmt(right.followers)}</b> urmăritori,
+         deci era <b>${relation}</b> <b>${left.displayName}</b> (${fmt(left.followers)}).`,
+        GIF_FAIL
+      );
+    }
+
+    function winGame(){
+      openModal(
+        "Perfect ✅",
+        `GG! Ai terminat tot deck-ul fără greșeală.<br/><br/>Scor perfect: <b>${score}</b>.`,
+        GIF_WIN
+      );
+    }
+
+    function newGame(){
+      overlay.classList.remove("show");
+      const gif = $("modalGif");
+      gif.removeAttribute("src");
+      gif.style.display = "none";
+
+      score = 0;
+      deck = shuffle(PLAYERS);
+      idx = 0;
+
+      left = deck[idx++];
+      right = deck[idx++];
+
+      // reset transforms/classes
+      leftPanel.className = "panel";
+      rightPanel.className = "panel";
+
+      renderAll();
+      setLocked(false);
+      updateHUD();
+    }
+
+    /* ✅ SWIPE când e corect */
+    function swipeNextRound(){
+      setLocked(true);
+
+      // phase 1: left iese, right vine spre stânga (dar stânga o rămâne pe loc, nu se animează)
+      leftPanel.classList.add("swipe-out-left");
+      // Removed: rightPanel.classList.add("swipe-to-left");
+
+      setTimeout(() => {
+        // curățăm clasele ca să nu rămână transform
+        leftPanel.classList.remove("swipe-out-left");
+        // Already removed above: rightPanel.classList.remove("swipe-to-left");
+
+        // avansăm data
+        left = right;
+        if(idx >= deck.length){
+          // ai terminat deck-ul
+          setLocked(true);
+          renderAll();
+          updateHUD();
+          winGame();
+          return;
+        }
+        right = deck[idx++];
+
+        // render nou (fără pulse, doar swipe)
+        renderAll();
+
+        // phase 2: noul right intră din dreapta
+        rightPanel.classList.add("swipe-in-right-pre");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            rightPanel.classList.remove("swipe-in-right-pre");
+            rightPanel.classList.add("swipe-in-right");
+          });
+        });
+
+        setTimeout(() => {
+          rightPanel.classList.remove("swipe-in-right");
+          setLocked(false);
+        }, SWIPE_MS);
+
+      }, SWIPE_MS);
+    }
+
+    function guess(which){
+      if(locked || overlay.classList.contains("show")) return;
+      setLocked(true);
+
+      revealRight();
+
+      const isMore = right.followers > left.followers;
+      const isLess = right.followers < left.followers;
+      const isEqual = right.followers === left.followers;
+
+      let correct = false;
+      if(isEqual) correct = true;
+      else if(which === "more") correct = isMore;
+      else correct = isLess;
+
+      setTimeout(() => {
+        if(correct){
+          flash("ok");
+          score++;
+
+          if(score > highscore){
+            highscore = score;
+            localStorage.setItem(KEY_HIGH, String(highscore));
+          }
+          updateHUD();
+
+          // ✅ aici e swipe-ul (în loc de nextRound instant)
+          swipeNextRound();
+        }else{
+          flash("bad");
+          gameOver();
+        }
+      }, 180);
+    }
+
+    async function loadPlayers(){
+      const users = KICK_URLS.map(slugFromUrl).filter(Boolean);
+
+      setLoad(10);
+      const res = await fetch("/api/kick/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ users })
+      });
+
+      setLoad(25);
+      if(!res.ok) throw new Error("Eroare server la /api/kick/batch");
+      const json = await res.json();
+      if(!json.ok) throw new Error(json.error || "Batch eșuat");
+
+      const results = json.results || [];
+      const loaded = [];
+
+      for(let i=0;i<results.length;i++){
+        const r = results[i];
+        if(r.ok && r.data){
+          const f = r.data.followers;
+          if(typeof f === "number" && Number.isFinite(f) && f > 0){
+            loaded.push(r.data);
+          }
+        }
+        const pct = 25 + Math.round(((i+1)/Math.max(1,results.length))*70);
+        setLoad(pct);
+      }
+
+      if(loaded.length < 2){
+        throw new Error("Nu există suficienți streameri cu urmăritori valizi.");
+      }
+      return loaded;
+    }
+
+    $("btnMore").addEventListener("click", () => guess("more"));
+    $("btnLess").addEventListener("click", () => guess("less"));
+
+    $("playAgain").addEventListener("click", newGame);
+    $("resetHigh").addEventListener("click", () => {
+      highscore = 0;
+      localStorage.setItem(KEY_HIGH, "0");
+      finalHigh.textContent = "0";
+      updateHUD();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if(overlay.classList.contains("show")){
+        if(e.key === "Enter") newGame();
+        return;
+      }
+      if(e.key === "ArrowUp") guess("more");
+      if(e.key === "ArrowDown") guess("less");
+    });
+
+    (async () => {
+      try{
+        $("hudBest").textContent = String(highscore);
+        updateHUD();
+
+        setLoad(4);
+        PLAYERS = await loadPlayers();
+
+        setLoad(100);
+      setTimeout(() => { 
+        $("loading").classList.add("hide");
+        setTimeout(() => { $("loading").style.display = "none"; }, 360);
+      }, 120);
+        newGame();
+      }catch(err){
+        console.error(err);
+        $("loadPct").textContent = "—";
+        $("barFill").style.width = "0%";
+        $("loading").style.background = "rgba(0,0,0,.85)";
+        $("loadText").textContent = "Eroare. Dă refresh.";
+      }
+    })();
+  </script>
+</body>
+</html>
